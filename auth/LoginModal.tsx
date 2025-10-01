@@ -37,14 +37,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onRegisterClic
 
     const success = await login(email, password);
     if (success) {
-      onClose();
-      // 通知父组件登录成功
+      // 立即通知父组件登录成功
       if (onLoginSuccess) {
         onLoginSuccess();
       }
+      onClose();
       // Reset form fields
       setEmail('');
       setPassword('');
+      // 强制刷新页面以确保显示正确的用户登录状态
+      window.location.reload();
     } else if (error) {
       setFormError(error);
     }

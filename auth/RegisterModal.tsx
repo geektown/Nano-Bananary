@@ -91,17 +91,19 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onLoginC
 
     const success = await register(name, email, password);
     if (success) {
-      onClose();
-      // 通知父组件注册成功
+      // 立即通知父组件注册成功
       if (onRegisterSuccess) {
         onRegisterSuccess();
       }
+      onClose();
       // Reset form fields
       setName('');
       setEmail('');
       setPassword('');
       setConfirmPassword('');
       setPasswordStrength(0);
+      // 强制刷新页面以确保显示正确的用户登录状态
+      window.location.reload();
     } else if (error) {
       setFormError(error);
     }

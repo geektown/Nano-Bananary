@@ -20,7 +20,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is authenticated on initial load
+  // Check if user is authenticated on initial load and when localStorage changes
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -39,16 +39,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           } else {
             // Token is invalid or expired, remove it
             localStorage.removeItem('jwt');
+            setUser(null);
           }
+        } else {
+          setUser(null);
         }
       } catch (err) {
         console.error('Error checking authentication:', err);
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
+
+    // Listen for storage events to handle changes from other tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'jwt') {
+        checkAuth();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {

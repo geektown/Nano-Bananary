@@ -25,6 +25,9 @@ const App: React.FC = () => {
   const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   
+  // 用于强制重新渲染组件，确保AuthContext的状态更新能被正确捕获
+  const [forceUpdate, setForceUpdate] = useState(false);
+  
   const [transformations, setTransformations] = useState<Transformation[]>(() => {
     try {
       const savedOrder = localStorage.getItem('transformationOrder');
@@ -503,7 +506,7 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans" key={forceUpdate}>
       <header className="bg-[var(--bg-card-alpha)] backdrop-blur-lg sticky top-0 z-20 p-4 border-b border-[var(--border-primary)]">
         <div className="container mx-auto flex justify-between items-center">
           <h1 
@@ -682,8 +685,7 @@ const App: React.FC = () => {
         }}
         onLoginSuccess={() => {
           // 强制重新渲染组件以更新用户状态
-          // 这里通过重新设置状态来触发组件重新渲染
-          setPrimaryImageUrl(prev => prev);
+          setForceUpdate(prev => !prev);
         }}
       />
       
@@ -696,7 +698,7 @@ const App: React.FC = () => {
         }}
         onRegisterSuccess={() => {
           // 强制重新渲染组件以更新用户状态
-          setPrimaryImageUrl(prev => prev);
+          setForceUpdate(prev => !prev);
         }}
       />
       
