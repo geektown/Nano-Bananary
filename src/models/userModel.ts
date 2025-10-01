@@ -56,7 +56,7 @@ export const createUser = async (
   // 创建用户积分账户
   await db.run(
     'INSERT INTO user_accounts (userId, balance, lastUpdated) VALUES (?, ?, ?)',
-    id, 0, now
+    id, 15, now
   );
   
   return {
