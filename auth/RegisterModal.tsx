@@ -8,9 +8,10 @@ interface RegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginClick: () => void;
+  onRegisterSuccess?: () => void;
 }
 
-const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onLoginClick }) => {
+const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onLoginClick, onRegisterSuccess }) => {
   const { register, isLoading, error } = useAuth();
   const { t } = useTranslation();
   const [name, setName] = useState<string>('');
@@ -91,6 +92,10 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onLoginC
     const success = await register(name, email, password);
     if (success) {
       onClose();
+      // 通知父组件注册成功
+      if (onRegisterSuccess) {
+        onRegisterSuccess();
+      }
       // Reset form fields
       setName('');
       setEmail('');

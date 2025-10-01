@@ -680,6 +680,11 @@ const App: React.FC = () => {
           setIsLoginModalOpen(false);
           setIsRegisterModalOpen(true);
         }}
+        onLoginSuccess={() => {
+          // 强制重新渲染组件以更新用户状态
+          // 这里通过重新设置状态来触发组件重新渲染
+          setPrimaryImageUrl(prev => prev);
+        }}
       />
       
       <RegisterModal
@@ -688,6 +693,10 @@ const App: React.FC = () => {
         onLoginClick={() => {
           setIsRegisterModalOpen(false);
           setIsLoginModalOpen(true);
+        }}
+        onRegisterSuccess={() => {
+          // 强制重新渲染组件以更新用户状态
+          setPrimaryImageUrl(prev => prev);
         }}
       />
       

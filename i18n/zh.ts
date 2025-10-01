@@ -109,7 +109,13 @@ export default {
     registered: "注册日期",
     credits: "可用积分",
     addCredits: "添加积分",
-    editProfile: "编辑资料"
+    editProfile: "编辑资料",
+    creditAmount: "积分数量",
+    paymentInitiatedDev: "支付流程已启动。充值功能尚未实现。",
+    refreshBalanceConfirm: "现在刷新您的余额吗？",
+    paymentInitiated: "支付流程已启动。您将被重定向到支付网关。",
+    refreshBalanceFailed: "刷新余额失败。请稍后再试。",
+    refreshBalance: "刷新余额"
   },
   transformations: {
     categories: {

@@ -8,9 +8,10 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onRegisterClick: () => void;
+  onLoginSuccess?: () => void;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onRegisterClick }) => {
+const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onRegisterClick, onLoginSuccess }) => {
   const { login, isLoading, error } = useAuth();
   const { t } = useTranslation();
   const [email, setEmail] = useState<string>('');
@@ -37,6 +38,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onRegisterClic
     const success = await login(email, password);
     if (success) {
       onClose();
+      // 通知父组件登录成功
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
       // Reset form fields
       setEmail('');
       setPassword('');

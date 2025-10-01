@@ -8,10 +8,11 @@ interface UserProfileProps {
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
-  const { user, logout, getBalance } = useAuth();
+  const { user, logout, getBalance, addCredit } = useAuth();
   const { t } = useTranslation();
   const [balance, setBalance] = useState<number>(0);
   const [loadingBalance, setLoadingBalance] = useState<boolean>(true);
+  const [creditAmount, setCreditAmount] = useState<number>(100);
 
   // Fetch user balance when component mounts or user changes
   useEffect(() => {
@@ -42,6 +43,47 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
+    }
+  };
+
+  const handleAddCredit = async () => {
+    try {
+      const success = await addCredit(creditAmount);
+      if (success) {
+        // 在实际环境中，用户会被重定向到支付网关
+        // 在开发环境中，我们显示一个提示
+        if (process.env.NODE_ENV === 'development') {
+          alert(t('auth.paymentInitiatedDev'));
+          // 在开发环境中，我们提供一个手动刷新余额的选项
+          if (window.confirm(t('auth.refreshBalanceConfirm'))) {
+            const updatedBalance = await getBalance();
+            setBalance(updatedBalance);
+          }
+        } else {
+          // 在生产环境中，用户会被重定向到支付网关
+          // 这里的代码不会执行到，因为重定向已经发生
+          alert(t('auth.paymentInitiated'));
+        }
+      } else {
+        alert(t('auth.creditAddedFailed'));
+      }
+    } catch (error) {
+      console.error('Error adding credit:', error);
+      alert(t('auth.creditAddedFailed'));
+    }
+  };
+
+  // 添加一个手动刷新余额的方法
+  const handleRefreshBalance = async () => {
+    try {
+      setLoadingBalance(true);
+      const updatedBalance = await getBalance();
+      setBalance(updatedBalance);
+    } catch (error) {
+      console.error('Error refreshing balance:', error);
+      alert(t('auth.refreshBalanceFailed'));
+    } finally {
+      setLoadingBalance(false);
     }
   };
 
@@ -88,30 +130,48 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-[var(--text-secondary)]">{t('auth.credits')}</span>
-              <span className="text-lg font-bold text-[var(--accent-primary)]">
-                {loadingBalance ? '...' : balance}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold text-[var(--accent-primary)]">
+                  {loadingBalance ? '...' : balance}
+                </span>
+                <button
+                  onClick={handleRefreshBalance}
+                  disabled={loadingBalance}
+                  className="p-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                  aria-label={t('auth.refreshBalance')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                {t('auth.creditAmount')}
+              </label>
+              <select
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(Number(e.target.value))}
+                className="w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)]"
+              >
+                <option value="100">100 {t('auth.credits')}</option>
+                <option value="500">500 {t('auth.credits')}</option>
+                <option value="1000">1000 {t('auth.credits')}</option>
+              </select>
+            </div>
+            
             <button
-              className="w-full py-3 px-4 bg-[var(--bg-secondary)] text-[var(--text-primary)] font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors flex items-center justify-center gap-2"
+              onClick={handleAddCredit}
+              className="w-full py-3 px-4 bg-[var(--accent-primary)] text-white font-semibold rounded-lg hover:bg-[var(--accent-secondary)] transition-colors flex items-center justify-center gap-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>{t('auth.addCredits')}</span>
-            </button>
-            
-            <button
-              className="w-full py-3 px-4 bg-[var(--bg-secondary)] text-[var(--text-primary)] font-semibold rounded-lg hover:bg-[var(--bg-hover)] transition-colors flex items-center justify-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>{t('auth.editProfile')}</span>
             </button>
           </div>
 

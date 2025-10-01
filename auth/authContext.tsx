@@ -8,6 +8,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   getBalance: () => Promise<number>;
+  addCredit: (amount: number) => Promise<boolean>;
   isLoading: boolean;
   error: string | null;
 }
@@ -23,7 +24,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem('jwt');
         if (token) {
           setIsLoading(true);
           const response = await fetch('http://localhost:3000/api/users/me', {
@@ -37,7 +38,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUser(userData);
           } else {
             // Token is invalid or expired, remove it
-            localStorage.removeItem('authToken');
+            localStorage.removeItem('jwt');
           }
         }
       } catch (err) {
@@ -70,7 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const { user: userData, token } = await response.json();
       setUser(userData);
-      localStorage.setItem('authToken', token);
+      localStorage.setItem('jwt', token);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -100,7 +101,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const { user: userData, token } = await response.json();
       setUser(userData);
-      localStorage.setItem('authToken', token);
+      localStorage.setItem('jwt', token);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -112,12 +113,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('authToken');
+    localStorage.removeItem('jwt');
   };
 
   const getBalance = async (): Promise<number> => {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('jwt');
       if (!token || !user) {
         return 0;
       }
@@ -139,6 +140,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const addCredit = async (amount: number): Promise<boolean> => {
+    try {
+      const token = localStorage.getItem('jwt');
+      if (!token || !user) {
+        return false;
+      }
+
+      // 根据后端API设计，通过创建支付订单来充值
+      // 按照要求使用微信支付方式，1元=10积分
+      const response = await fetch('http://localhost:3000/api/payments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: amount / 10, // 1元=10积分，所以需要将积分数量转换为金额
+          method: 'wechat' // 使用微信支付方式
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // 在实际环境中，这里应该跳转到支付网关URL
+        // 但由于是开发环境，我们需要特殊处理
+        if (process.env.NODE_ENV === 'development') {
+          // 在开发环境下，我们创建一个模拟支付成功的方式
+          // 但不直接调用模拟接口，而是返回true让前端认为支付已发起
+          return true;
+        } else {
+          // 在生产环境中，重定向到支付网关URL
+          window.location.href = data.paymentUrl;
+          return true;
+        }
+      }
+      
+      // 如果响应不成功，尝试获取错误信息
+      const errorData = await response.json();
+      console.error('Payment creation failed:', errorData);
+      return false;
+    } catch (err) {
+      console.error('Error adding credit:', err);
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider 
       value={{
@@ -148,6 +196,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         register,
         logout,
         getBalance,
+        addCredit,
         isLoading,
         error
       }}

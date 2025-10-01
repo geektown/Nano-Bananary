@@ -109,7 +109,13 @@ export default {
     registered: "Registered Date",
     credits: "Available Credits",
     addCredits: "Add Credits",
-    editProfile: "Edit Profile"
+    editProfile: "Edit Profile",
+    creditAmount: "Credit Amount",
+    paymentInitiatedDev: "Payment process initiated. Payment not implemented in development mode.",
+    refreshBalanceConfirm: "Would you like to refresh your balance now?",
+    paymentInitiated: "Payment process initiated. You will be redirected to payment gateway.",
+    refreshBalanceFailed: "Failed to refresh balance. Please try again later.",
+    refreshBalance: "Refresh balance"
   },
   transformations: {
     categories: {
