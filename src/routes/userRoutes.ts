@@ -111,7 +111,7 @@ router.post('/login', async (req, res) => {
     
     // 检查账户是否已验证
     if (!user.isVerified) {
-      return res.status(403).json({ error: 'Please verify your email before logging in' });
+      // return res.status(403).json({ error: 'Please verify your email before logging in' });
     }
     
     // 重置登录尝试次数
