@@ -27,7 +27,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onLoginC
     let strength = 0;
     
     // Length check
-    if (pwd.length >= 8) strength += 1;
+    if (pwd.length >= 6) strength += 3;
     
     // Contains lowercase
     if (/[a-z]/.test(pwd)) strength += 1;

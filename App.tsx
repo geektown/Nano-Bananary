@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { editImage as geminiEditImage } from './services/geminiService.js';
 import { TRANSFORMATIONS } from './constants';
-import { editImage, generateVideo } from './services/geminiService';
 import type { GeneratedContent, Transformation, User } from './types';
 import TransformationSelector from './components/TransformationSelector';
 import ResultDisplay from './components/ResultDisplay';
@@ -69,7 +69,9 @@ const App: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
-  
+  const [hasPendingGenerationRequest, setHasPendingGenerationRequest] = useState<boolean>(false);
+  const [pendingGenerationType, setPendingGenerationType] = useState<'image' | 'video' | null>(null);
+
   useEffect(() => {
     try {
       const orderToSave = transformations.map(t => t.key);
@@ -78,7 +80,7 @@ const App: React.FC = () => {
       console.error("Failed to save transformation order to localStorage", e);
     }
   }, [transformations]);
-  
+
   // Cleanup blob URLs on unmount or when dependencies change
   useEffect(() => {
     return () => {
@@ -92,6 +94,8 @@ const App: React.FC = () => {
         }
     };
   }, [history, generatedContent]);
+
+
 
 
   const handleSelectTransformation = (transformation: Transformation) => {
@@ -145,6 +149,8 @@ const App: React.FC = () => {
     // Check if user is authenticated
     if (!isAuthenticated) {
       setIsLoginModalOpen(true);
+      setHasPendingGenerationRequest(true);
+      setPendingGenerationType('video');
       return;
     }
 
@@ -160,20 +166,39 @@ const App: React.FC = () => {
             imagePayload = { base64: primaryBase64, mimeType: primaryMimeType };
         }
 
-        const videoDownloadUrl = await generateVideo(
-            promptToUse,
-            imagePayload,
-            aspectRatio,
-            (message) => setLoadingMessage(message), // Progress callback
-            localStorage.getItem('jwt') // Auth token
-        );
+        const token = localStorage.getItem('jwt');
+        const response = await fetch('http://localhost:3000/api/services/generate-video', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                prompt: promptToUse,
+                aspectRatio: aspectRatio,
+                image: imagePayload
+            })
+        });
 
-        setLoadingMessage(t('app.loading.videoFetching'));
-        const response = await fetch(videoDownloadUrl);
         if (!response.ok) {
-            throw new Error(`Failed to download video file. Status: ${response.statusText}`);
+            if (response.status === 401) {
+                localStorage.removeItem('jwt');
+                throw new Error('401');
+            } else if (response.status === 402) {
+                throw new Error('402');
+            }
+            throw new Error(`Failed to generate video. Status: ${response.statusText}`);
         }
-        const blob = await response.blob();
+
+        const data = await response.json();
+        const videoUrl = data.videoUrl;
+        
+        setLoadingMessage(t('app.loading.videoFetching'));
+        const videoResponse = await fetch(videoUrl);
+        if (!videoResponse.ok) {
+            throw new Error(`Failed to download video file. Status: ${videoResponse.statusText}`);
+        }
+        const blob = await videoResponse.blob();
         const objectUrl = URL.createObjectURL(blob);
 
         const result: GeneratedContent = {
@@ -187,12 +212,12 @@ const App: React.FC = () => {
 
     } catch (err) {
         console.error(err);
-        if (err instanceof Error && err.message.includes('401')) {
+        if (err instanceof Error && err.message === '401') {
           // Token expired or invalid
           localStorage.removeItem('jwt');
           setError(t('auth.tokenExpired'));
           setIsLoginModalOpen(true);
-        } else if (err instanceof Error && err.message.includes('402')) {
+        } else if (err instanceof Error && err.message === '402') {
           // Insufficient credits
           setError(t('auth.insufficientCredits'));
         } else {
@@ -223,6 +248,8 @@ const App: React.FC = () => {
     // Check if user is authenticated
     if (!isAuthenticated) {
       setIsLoginModalOpen(true);
+      setHasPendingGenerationRequest(true);
+      setPendingGenerationType('image');
       return;
     }
 
@@ -236,61 +263,44 @@ const App: React.FC = () => {
         const primaryBase64 = primaryImageUrl!.split(',')[1];
         const maskBase64 = maskDataUrl ? maskDataUrl.split(',')[1] : null;
 
-        // Get auth token
-        const authToken = localStorage.getItem('jwt');
-
-        if (selectedTransformation.isTwoStep) {
-            setLoadingMessage(t('app.loading.step1'));
-            const stepOneResult = await editImage(primaryBase64, primaryMimeType, promptToUse, null, null, authToken);
-
-            if (!stepOneResult.imageUrl) throw new Error("Step 1 (line art) failed to generate an image.");
-
-            setLoadingMessage(t('app.loading.step2'));
-            const stepOneImageBase64 = stepOneResult.imageUrl.split(',')[1];
-            const stepOneImageMimeType = stepOneResult.imageUrl.split(';')[0].split(':')[1] ?? 'image/png';
-
-            let secondaryImagePayload = null;
-            if (secondaryImageUrl) {
-                const primaryImage = await loadImage(primaryImageUrl);
-                const resizedSecondaryImageUrl = await resizeImageToMatch(secondaryImageUrl, primaryImage);
-                const secondaryMimeType = resizedSecondaryImageUrl.split(';')[0].split(':')[1] ?? 'image/png';
-                const secondaryBase64 = resizedSecondaryImageUrl.split(',')[1];
-                secondaryImagePayload = { base64: secondaryBase64, mimeType: secondaryMimeType };
-            }
-
-            const stepTwoResult = await editImage(stepOneImageBase64, stepOneImageMimeType, selectedTransformation.stepTwoPrompt!, null, secondaryImagePayload, authToken);
-            
-            if (stepTwoResult.imageUrl) {
-                stepTwoResult.imageUrl = await embedWatermark(stepTwoResult.imageUrl, "Nano Bananary｜ZHO");
-            }
-
-            const finalResult = { ...stepTwoResult, secondaryImageUrl: stepOneResult.imageUrl };
-            setGeneratedContent(finalResult);
-            setHistory(prev => [finalResult, ...prev]);
-
-        } else {
-             let secondaryImagePayload = null;
-            if (selectedTransformation.isMultiImage && secondaryImageUrl) {
-                const secondaryMimeType = secondaryImageUrl.split(';')[0].split(':')[1] ?? 'image/png';
-                const secondaryBase64 = secondaryImageUrl.split(',')[1];
-                secondaryImagePayload = { base64: secondaryBase64, mimeType: secondaryMimeType };
-            }
-            setLoadingMessage(t('app.loading.default'));
-            const result = await editImage(primaryBase64, primaryMimeType, promptToUse, maskBase64, secondaryImagePayload, authToken);
-
-            if (result.imageUrl) result.imageUrl = await embedWatermark(result.imageUrl, "Nano Bananary｜ZHO");
-
-            setGeneratedContent(result);
-            setHistory(prev => [result, ...prev]);
+        let secondaryImagePayload = null;
+        if (selectedTransformation.isMultiImage && secondaryImageUrl) {
+            const secondaryMimeType = secondaryImageUrl.split(';')[0].split(':')[1] ?? 'image/png';
+            const secondaryBase64 = secondaryImageUrl.split(',')[1];
+            secondaryImagePayload = { base64: secondaryBase64, mimeType: secondaryMimeType };
         }
+        
+        // For two-step transformations, we need to handle it differently
+        // Since geminiService doesn't support two-step directly, we'll use the promptToUse for now
+        // Future improvement: Enhance geminiService to support two-step transformations
+        
+        setLoadingMessage(selectedTransformation.isTwoStep ? t('app.loading.step1') : t('app.loading.default'));
+        
+        // Directly call Gemini API through geminiService
+        const result = await geminiEditImage(
+            primaryBase64,
+            primaryMimeType,
+            promptToUse,
+            maskBase64,
+            secondaryImagePayload
+        );
+
+        // Apply watermark if needed
+        if (result.imageUrl) {
+            result.imageUrl = await embedWatermark(result.imageUrl, "Nano Bananary｜ZHO");
+        }
+
+        // Update state with the generated result
+        setGeneratedContent(result);
+        setHistory(prev => [result, ...prev]);
     } catch (err) {
       console.error(err);
-      if (err instanceof Error && err.message.includes('401')) {
+      if (err instanceof Error && err.message === '401') {
         // Token expired or invalid
         localStorage.removeItem('jwt');
         setError(t('auth.tokenExpired'));
         setIsLoginModalOpen(true);
-      } else if (err instanceof Error && err.message.includes('402')) {
+      } else if (err instanceof Error && err.message === '402') {
         // Insufficient credits
         setError(t('auth.insufficientCredits'));
       } else {
@@ -302,6 +312,19 @@ const App: React.FC = () => {
     }
   }, [primaryImageUrl, secondaryImageUrl, selectedTransformation, maskDataUrl, customPrompt, t, isAuthenticated, setIsLoginModalOpen]);
   
+  // When user logs in and there's a pending generation request, execute it
+  useEffect(() => {
+    if (isAuthenticated && hasPendingGenerationRequest) {
+      setHasPendingGenerationRequest(false);
+      if (pendingGenerationType === 'video') {
+        handleGenerateVideo();
+      } else {
+        handleGenerateImage();
+      }
+      setPendingGenerationType(null);
+    }
+  }, [isAuthenticated, hasPendingGenerationRequest, pendingGenerationType, handleGenerateImage, handleGenerateVideo]);
+
   const handleGenerate = useCallback(() => {
     if (selectedTransformation?.isVideo) {
       handleGenerateVideo();

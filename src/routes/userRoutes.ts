@@ -27,11 +27,11 @@ router.post('/register', async (req, res) => {
     }
     
     // 验证密码强度
-    if (!isStrongPassword(password)) {
-      return res.status(400).json({
-        error: 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character'
-      });
-    }
+      if (!isStrongPassword(password)) {
+        return res.status(400).json({
+          error: 'Password must be at least 6 characters long'
+        });
+      }
     
     // 检查用户是否已存在
     const existingUserByEmail = await getUserByEmail(email);
@@ -162,11 +162,11 @@ router.post('/change-password', async (req, res) => {
     }
     
     // 验证新密码强度
-    if (!isStrongPassword(newPassword)) {
-      return res.status(400).json({
-        error: 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character'
-      });
-    }
+      if (!isStrongPassword(newPassword)) {
+        return res.status(400).json({
+          error: 'Password must be at least 6 characters long'
+        });
+      }
     
     const success = await updateUserPassword(userId, currentPassword, newPassword);
     
@@ -192,11 +192,11 @@ router.post('/reset-password', async (req, res) => {
     }
     
     // 验证新密码强度
-    if (!isStrongPassword(newPassword)) {
-      return res.status(400).json({
-        error: 'Password must be at least 8 characters long and contain uppercase, lowercase, number, and special character'
-      });
-    }
+      if (!isStrongPassword(newPassword)) {
+        return res.status(400).json({
+          error: 'Password must be at least 6 characters long'
+        });
+      }
     
     const success = await resetUserPassword(email, newPassword);
     
@@ -236,8 +236,8 @@ router.get('/me', authMiddleware, async (req, res) => {
 
 // 辅助函数：验证密码强度
 const isStrongPassword = (password: string): boolean => {
-  // 至少8位，包含大小写字母、数字和特殊字符
-  const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  // 至少6位
+  const regex = /^.{6,}$/;
   return regex.test(password);
 };
 

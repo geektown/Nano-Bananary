@@ -2,6 +2,8 @@ import express from 'express';
 import { authMiddleware, getUserIdFromAuth } from '../utils/authUtils.js';
 import { getUserAccount } from '../models/accountModel.js';
 import { checkBalance, deductCredits } from '../models/accountModel.js';
+import { editImage as geminiEditImage, generateVideo as geminiGenerateVideo } from '../../services/geminiService.js';
+import type { GeneratedContent } from '../../types';
 
 const router = express.Router();
 
@@ -19,19 +21,17 @@ const checkUserBalance = async (
   serviceName: string
 ): Promise<{ hasSufficientBalance: boolean; requiredCredits: number }> => {
   const requiredCredits = SERVICE_PRICES[serviceName as keyof typeof SERVICE_PRICES] || 0;
-  // 检查用户积分余额
-  const account = await getUserAccount(userId);
-  const balance = account ? account.balance : 0;
+  // 使用 checkBalance 函数检查用户积分
+  const hasSufficientBalance = await checkBalance(userId, requiredCredits);
   
   return {
-    hasSufficientBalance: balance >= requiredCredits,
+    hasSufficientBalance,
     requiredCredits
   };
 };
 
 /**
  * 处理图像编辑请求
- * 注意：这是一个示例实现，实际应用中需要集成Gemini API
  */
 router.post('/edit-image', authMiddleware, async (req, res) => {
   try {
@@ -51,25 +51,64 @@ router.post('/edit-image', authMiddleware, async (req, res) => {
     }
     
     // 获取请求数据
-    const { imageData, prompt } = req.body;
+    const { base64ImageData, mimeType, prompt, maskBase64, secondaryImage, isTwoStep, stepTwoPrompt } = req.body;
     
-    if (!imageData || !prompt) {
-      return res.status(400).json({ error: 'Image data and prompt are required' });
+    if (!base64ImageData || !mimeType || !prompt) {
+      return res.status(400).json({ error: 'Image data, MIME type and prompt are required' });
     }
     
-    // 模拟处理延迟
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    let result: GeneratedContent;
+    
+    if (isTwoStep && stepTwoPrompt) {
+      // 两步处理流程
+      // 第一步：生成线条艺术
+      const stepOneResult: GeneratedContent = await geminiEditImage(
+        base64ImageData, 
+        mimeType, 
+        prompt,
+        null,
+        null
+      );
+      
+      if (!stepOneResult.imageUrl) {
+        throw new Error("Step 1 (line art) failed to generate an image.");
+      }
+      
+      // 第二步：应用第二步提示
+      const stepOneImageBase64 = stepOneResult.imageUrl.split(',')[1];
+      const stepOneImageMimeType = stepOneResult.imageUrl.split(';')[0].split(':')[1] || 'image/png';
+      
+      const stepTwoResult: GeneratedContent = await geminiEditImage(
+        stepOneImageBase64, 
+        stepOneImageMimeType, 
+        stepTwoPrompt,
+        null,
+        secondaryImage || null
+      );
+      
+      // 合并结果，保留第一步的图像作为secondaryImageUrl
+      result = { 
+        ...stepTwoResult, 
+        secondaryImageUrl: stepOneResult.imageUrl 
+      };
+    } else {
+      // 标准一步处理流程
+      result = await geminiEditImage(
+        base64ImageData, 
+        mimeType, 
+        prompt,
+        maskBase64 || null,
+        secondaryImage || null
+      );
+    }
     
     // 扣除用户积分
     await deductCredits(userId, requiredCredits, 'Used AI Image Editing service');
     
-    // 这里应该是实际调用Gemini API处理图像编辑的代码
-    // 为了演示，我们返回一个模拟的成功响应
     res.status(200).json({
       success: true,
       message: 'Image edited successfully',
-      // 在实际应用中，这里应该返回编辑后的图像数据
-      editedImageUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+      result
     });
   } catch (error) {
     console.error('Error processing image edit request:', error);
@@ -79,7 +118,6 @@ router.post('/edit-image', authMiddleware, async (req, res) => {
 
 /**
  * 处理视频生成请求
- * 注意：这是一个示例实现，实际应用中需要集成视频生成API
  */
 router.post('/generate-video', authMiddleware, async (req, res) => {
   try {
@@ -99,26 +137,33 @@ router.post('/generate-video', authMiddleware, async (req, res) => {
     }
     
     // 获取请求数据
-    const { prompt, duration } = req.body;
+    const { prompt, aspectRatio, image } = req.body;
     
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
     
-    // 模拟处理延迟
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // 设置进度回调函数
+    const onProgress = (message: string) => {
+      // 在实际应用中，可以使用WebSocket或其他方式将进度发送给客户端
+      console.log(`Video generation progress: ${message}`);
+    };
+    
+    // 调用Gemini API生成视频
+    const downloadLink = await geminiGenerateVideo(
+      prompt,
+      aspectRatio || '16:9',
+      image || null,
+      onProgress
+    );
     
     // 扣除用户积分
     await deductCredits(userId, requiredCredits, 'Used AI Video Generation service');
     
-    // 这里应该是实际调用视频生成API的代码
-    // 为了演示，我们返回一个模拟的成功响应
     res.status(200).json({
       success: true,
-      message: 'Video generation started',
-      // 在实际应用中，这里应该返回视频生成任务的ID或状态
-      taskId: `video_${Date.now()}`,
-      estimatedDuration: duration || 30
+      message: 'Video generation completed',
+      videoUrl: downloadLink
     });
   } catch (error) {
     console.error('Error processing video generation request:', error);

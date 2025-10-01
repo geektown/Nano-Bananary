@@ -72,15 +72,25 @@ npm start
    - 后端已配置 CORS 中间件，通常不需要额外配置
    - 如有特殊需求，可以修改 src/server.ts 中的 CORS 配置
 
-## 环境变量（可选）
+## 环境变量
 
-项目支持以下环境变量：
+### 必需的环境变量
+- `GEMINI_API_KEY`：Google Gemini API 密钥（必需）
+  - 您可以从这里获取 API 密钥：https://aistudio.google.com/app/apikey
+
+### 可选的环境变量
 - `PORT`：设置后端服务端口（默认：3000）
 - `NODE_ENV`：设置环境类型（development/production）
 
-可以创建 .env 文件来设置这些变量：
+可以创建 .env 文件来设置这些变量。项目已包含 .env.example 文件作为参考：
 
 ```env
+# Google Gemini API Key (required)
+GEMINI_API_KEY=your_google_gemini_api_key_here
+
+# Optional configuration
 PORT=3000
 NODE_ENV=development
 ```
+
+**重要提示**：在启动服务前，请确保已设置 GEMINI_API_KEY 环境变量，否则服务将无法正常启动。
