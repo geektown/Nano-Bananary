@@ -3,16 +3,17 @@ import { useAuth } from './authContext';
 import { useTranslation } from '../i18n/context';
 
 interface UserProfileProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
   const { user, logout, getBalance } = useAuth();
   const { t } = useTranslation();
   const [balance, setBalance] = useState<number>(0);
   const [loadingBalance, setLoadingBalance] = useState<boolean>(true);
 
-  // Fetch user balance when component mounts
+  // Fetch user balance when component mounts or user changes
   useEffect(() => {
     const fetchBalance = async () => {
       try {
@@ -44,7 +45,8 @@ const UserProfile: React.FC<UserProfileProps> = ({ onClose }) => {
     }
   };
 
-  if (!user) return null;
+  // If not open or no user, don't render
+  if (!isOpen || !user) return null;
 
   return (
     <div 

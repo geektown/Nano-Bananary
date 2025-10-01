@@ -692,6 +692,7 @@ const App: React.FC = () => {
       />
       
       <UserProfile
+        isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
       />
     </div>

@@ -2,20 +2,35 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { GeneratedContent } from '../types';
 
-if (!process.env.API_KEY) {
-  throw new Error("API_KEY environment variable is not set.");
-}
+// Get API key from environment variables or use an empty string as fallback
+const DEFAULT_API_KEY = process.env.GEMINI_API_KEY || '';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Create a helper function to get a GoogleGenAI client with the provided API key
+const getGenAIClient = (apiKey: string = DEFAULT_API_KEY) => {
+  if (!apiKey) {
+    throw new Error("API key is required. Please set GEMINI_API_KEY environment variable or provide it as a parameter.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+// Create a default client if API key is available
+const defaultClient = DEFAULT_API_KEY ? getGenAIClient() : null;
 
 export async function editImage(
     base64ImageData: string, 
     mimeType: string, 
     prompt: string,
     maskBase64: string | null,
-    secondaryImage: { base64: string; mimeType: string } | null
+    secondaryImage: { base64: string; mimeType: string } | null,
+    apiKey?: string
 ): Promise<GeneratedContent> {
   try {
+    // Get AI client with provided API key or default
+    const ai = apiKey ? getGenAIClient(apiKey) : defaultClient;
+    if (!ai) {
+        throw new Error("API key is required. Please set GEMINI_API_KEY environment variable or provide it as a parameter.");
+    }
+
     let fullPrompt = prompt;
     const parts: any[] = [
       {
@@ -85,8 +100,9 @@ export async function editImage(
         throw new Error(errorMessage);
     }
 
-    return result;
+    // 注意：积分扣除逻辑已移至服务器端处理
 
+    return result;
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     if (error instanceof Error) {
@@ -104,8 +120,9 @@ export async function editImage(
             }
         } catch (e) {}
         throw new Error(errorMessage);
+    } else {
+        throw new Error("An unknown error occurred while communicating with the API.");
     }
-    throw new Error("An unknown error occurred while communicating with the API.");
   }
 }
 
@@ -113,9 +130,16 @@ export async function generateVideo(
     prompt: string,
     image: { base64: string; mimeType: string } | null,
     aspectRatio: '16:9' | '9:16',
-    onProgress: (message: string) => void
+    onProgress: (message: string) => void,
+    apiKey?: string
 ): Promise<string> {
     try {
+        // Get AI client with provided API key or default
+        const ai = apiKey ? getGenAIClient(apiKey) : defaultClient;
+        if (!ai) {
+            throw new Error("API key is required. Please set GEMINI_API_KEY environment variable or provide it as a parameter.");
+        }
+
         onProgress("Initializing video generation...");
 
         // FIX: The `request` object was explicitly typed as `any`, which caused a loss of type
@@ -147,7 +171,10 @@ export async function generateVideo(
         }
 
         if (operation.error) {
-            throw new Error(operation.error.message || "Video generation failed during operation.");
+            const errorMessage = typeof operation.error === 'object' && operation.error !== null && 'message' in operation.error
+                ? String(operation.error.message)
+                : "Video generation failed during operation.";
+            throw new Error(errorMessage);
         }
 
         const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
@@ -156,7 +183,11 @@ export async function generateVideo(
             throw new Error("Video generation completed, but no download link was found.");
         }
 
-        return `${downloadLink}&key=${process.env.API_KEY}`;
+        // 注意：积分扣除逻辑已移至服务器端处理
+        // Use the provided API key or the default one for the download URL
+        const keyToUse = apiKey || DEFAULT_API_KEY;
+
+        return `${downloadLink}&key=${keyToUse}`;
 
     } catch (error) {
         console.error("Error calling Video Generation API:", error);
