@@ -79,6 +79,38 @@ export default {
   error: {
     title: "An Error Occurred"
   },
+  auth: {
+    login: "Login",
+    register: "Register",
+    logout: "Logout",
+    profile: "Your Profile",
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    confirmPassword: "Confirm Password",
+    forgotPassword: "Forgot Password?",
+    dontHaveAccount: "Don't have an account?",
+    alreadyHaveAccount: "Already have an account?",
+    nameRequired: "Name is required",
+    emailRequired: "Email is required",
+    passwordRequired: "Password is required",
+    invalidEmail: "Please enter a valid email address",
+    passwordsDontMatch: "Passwords don't match",
+    passwordTooWeak: "Password is too weak. Please include uppercase, lowercase, numbers and special characters.",
+    enterPassword: "Enter a password",
+    veryWeak: "Very weak",
+    weak: "Weak",
+    medium: "Medium",
+    strong: "Strong",
+    veryStrong: "Very strong",
+    loggingIn: "Logging in...",
+    registering: "Registering...",
+    confirmLogout: "Are you sure you want to logout?",
+    registered: "Registered Date",
+    credits: "Available Credits",
+    addCredits: "Add Credits",
+    editProfile: "Edit Profile"
+  },
   transformations: {
     categories: {
       viral: { title: "Viral & Fun" },

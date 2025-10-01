@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { TRANSFORMATIONS } from './constants';
 import { editImage, generateVideo } from './services/geminiService';
-import type { GeneratedContent, Transformation } from './types';
+import type { GeneratedContent, Transformation, User } from './types';
 import TransformationSelector from './components/TransformationSelector';
 import ResultDisplay from './components/ResultDisplay';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -14,11 +14,17 @@ import HistoryPanel from './components/HistoryPanel';
 import { useTranslation } from './i18n/context';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import ThemeSwitcher from './components/ThemeSwitcher';
+import { useAuth } from './auth/authContext';
+import LoginModal from './auth/LoginModal';
+import RegisterModal from './auth/RegisterModal';
+import UserProfile from './auth/UserProfile';
 
 type ActiveTool = 'mask' | 'none';
 
 const App: React.FC = () => {
   const { t } = useTranslation();
+  const { user, isAuthenticated } = useAuth();
+  
   const [transformations, setTransformations] = useState<Transformation[]>(() => {
     try {
       const savedOrder = localStorage.getItem('transformationOrder');
@@ -58,6 +64,11 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<GeneratedContent[]>([]);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<Transformation | null>(null);
+  
+  // Auth modal states
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   
   useEffect(() => {
     try {
@@ -131,6 +142,12 @@ const App: React.FC = () => {
         return;
     }
 
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedContent(null);
@@ -147,7 +164,8 @@ const App: React.FC = () => {
             promptToUse,
             imagePayload,
             aspectRatio,
-            (message) => setLoadingMessage(message) // Progress callback
+            (message) => setLoadingMessage(message), // Progress callback
+            localStorage.getItem('jwt') // Auth token
         );
 
         setLoadingMessage(t('app.loading.videoFetching'));
@@ -169,12 +187,22 @@ const App: React.FC = () => {
 
     } catch (err) {
         console.error(err);
-        setError(err instanceof Error ? err.message : t('app.error.unknown'));
+        if (err instanceof Error && err.message.includes('401')) {
+          // Token expired or invalid
+          localStorage.removeItem('jwt');
+          setError(t('auth.tokenExpired'));
+          setIsLoginModalOpen(true);
+        } else if (err instanceof Error && err.message.includes('402')) {
+          // Insufficient credits
+          setError(t('auth.insufficientCredits'));
+        } else {
+          setError(err instanceof Error ? err.message : t('app.error.unknown'));
+        }
     } finally {
         setIsLoading(false);
         setLoadingMessage('');
     }
-  }, [selectedTransformation, customPrompt, primaryImageUrl, aspectRatio, t]);
+  }, [selectedTransformation, customPrompt, primaryImageUrl, aspectRatio, t, isAuthenticated, setIsLoginModalOpen]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!primaryImageUrl || !selectedTransformation) {
@@ -192,6 +220,12 @@ const App: React.FC = () => {
         return;
     }
 
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedContent(null);
@@ -202,9 +236,12 @@ const App: React.FC = () => {
         const primaryBase64 = primaryImageUrl!.split(',')[1];
         const maskBase64 = maskDataUrl ? maskDataUrl.split(',')[1] : null;
 
+        // Get auth token
+        const authToken = localStorage.getItem('jwt');
+
         if (selectedTransformation.isTwoStep) {
             setLoadingMessage(t('app.loading.step1'));
-            const stepOneResult = await editImage(primaryBase64, primaryMimeType, promptToUse, null, null);
+            const stepOneResult = await editImage(primaryBase64, primaryMimeType, promptToUse, null, null, authToken);
 
             if (!stepOneResult.imageUrl) throw new Error("Step 1 (line art) failed to generate an image.");
 
@@ -221,7 +258,7 @@ const App: React.FC = () => {
                 secondaryImagePayload = { base64: secondaryBase64, mimeType: secondaryMimeType };
             }
 
-            const stepTwoResult = await editImage(stepOneImageBase64, stepOneImageMimeType, selectedTransformation.stepTwoPrompt!, null, secondaryImagePayload);
+            const stepTwoResult = await editImage(stepOneImageBase64, stepOneImageMimeType, selectedTransformation.stepTwoPrompt!, null, secondaryImagePayload, authToken);
             
             if (stepTwoResult.imageUrl) {
                 stepTwoResult.imageUrl = await embedWatermark(stepTwoResult.imageUrl, "Nano Bananary｜ZHO");
@@ -239,7 +276,7 @@ const App: React.FC = () => {
                 secondaryImagePayload = { base64: secondaryBase64, mimeType: secondaryMimeType };
             }
             setLoadingMessage(t('app.loading.default'));
-            const result = await editImage(primaryBase64, primaryMimeType, promptToUse, maskBase64, secondaryImagePayload);
+            const result = await editImage(primaryBase64, primaryMimeType, promptToUse, maskBase64, secondaryImagePayload, authToken);
 
             if (result.imageUrl) result.imageUrl = await embedWatermark(result.imageUrl, "Nano Bananary｜ZHO");
 
@@ -248,12 +285,22 @@ const App: React.FC = () => {
         }
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : t('app.error.unknown'));
+      if (err instanceof Error && err.message.includes('401')) {
+        // Token expired or invalid
+        localStorage.removeItem('jwt');
+        setError(t('auth.tokenExpired'));
+        setIsLoginModalOpen(true);
+      } else if (err instanceof Error && err.message.includes('402')) {
+        // Insufficient credits
+        setError(t('auth.insufficientCredits'));
+      } else {
+        setError(err instanceof Error ? err.message : t('app.error.unknown'));
+      }
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
     }
-  }, [primaryImageUrl, secondaryImageUrl, selectedTransformation, maskDataUrl, customPrompt, t]);
+  }, [primaryImageUrl, secondaryImageUrl, selectedTransformation, maskDataUrl, customPrompt, t, isAuthenticated, setIsLoginModalOpen]);
   
   const handleGenerate = useCallback(() => {
     if (selectedTransformation?.isVideo) {
@@ -453,6 +500,37 @@ const App: React.FC = () => {
               </svg>
               <span className="hidden sm:inline">{t('app.history')}</span>
             </button>
+            
+            {/* Auth buttons */}
+            {!isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="py-2 px-3 text-sm font-semibold text-[var(--text-primary)] bg-[rgba(107,114,128,0.2)] rounded-md hover:bg-[rgba(107,114,128,0.4)] transition-colors duration-200"
+                >
+                  {t('auth.login')}
+                </button>
+                <button
+                  onClick={() => setIsRegisterModalOpen(true)}
+                  className="py-2 px-3 text-sm font-semibold text-[var(--text-on-accent)] bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] rounded-md hover:from-[var(--accent-primary-hover)] hover:to-[var(--accent-secondary-hover)] transition-colors duration-200"
+                >
+                  {t('auth.register')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setIsProfileModalOpen(true)}
+                  className="flex items-center gap-2 py-2 px-3 text-sm font-semibold text-[var(--text-primary)] rounded-full hover:bg-[rgba(107,114,128,0.2)] transition-colors duration-200"
+                  aria-label="User profile"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center text-white text-xs font-bold">
+                    {user?.username.charAt(0).toUpperCase()}
+                  </div>
+                </button>
+              </>
+            )}
+            
             <LanguageSwitcher />
             <ThemeSwitcher />
           </div>
@@ -569,6 +647,29 @@ const App: React.FC = () => {
         history={history}
         onUseImage={handleUseHistoryImageAsInput}
         onDownload={handleDownloadFromHistory}
+      />
+      
+      {/* Auth modals */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onRegisterClick={() => {
+          setIsLoginModalOpen(false);
+          setIsRegisterModalOpen(true);
+        }}
+      />
+      
+      <RegisterModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onLoginClick={() => {
+          setIsRegisterModalOpen(false);
+          setIsLoginModalOpen(true);
+        }}
+      />
+      
+      <UserProfile
+        onClose={() => setIsProfileModalOpen(false)}
       />
     </div>
   );

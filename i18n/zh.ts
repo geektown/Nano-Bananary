@@ -79,6 +79,38 @@ export default {
   error: {
     title: "发生错误"
   },
+  auth: {
+    login: "登录",
+    register: "注册",
+    logout: "退出登录",
+    profile: "个人资料",
+    name: "姓名",
+    email: "邮箱",
+    password: "密码",
+    confirmPassword: "确认密码",
+    forgotPassword: "忘记密码？",
+    dontHaveAccount: "还没有账号？",
+    alreadyHaveAccount: "已有账号？",
+    nameRequired: "请输入姓名",
+    emailRequired: "请输入邮箱",
+    passwordRequired: "请输入密码",
+    invalidEmail: "请输入有效的邮箱地址",
+    passwordsDontMatch: "两次输入的密码不一致",
+    passwordTooWeak: "密码太弱。请包含大写字母、小写字母、数字和特殊字符。",
+    enterPassword: "请输入密码",
+    veryWeak: "非常弱",
+    weak: "弱",
+    medium: "中等",
+    strong: "强",
+    veryStrong: "非常强",
+    loggingIn: "登录中...",
+    registering: "注册中...",
+    confirmLogout: "确定要退出登录吗？",
+    registered: "注册日期",
+    credits: "可用积分",
+    addCredits: "添加积分",
+    editProfile: "编辑资料"
+  },
   transformations: {
     categories: {
       viral: { title: "网红玩法" },
