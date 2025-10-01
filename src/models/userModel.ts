@@ -47,9 +47,10 @@ export const createUser = async (
   const now = new Date().toISOString();
   const verificationToken = generateId();
   
+  // 直接设置用户为已验证状态，无需邮箱验证
   await db.run(
     'INSERT INTO users (id, username, email, phone, passwordHash, salt, isVerified, verificationToken, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    id, username, email, phone, passwordHash, salt, 0, verificationToken, now, now
+    id, username, email, phone, passwordHash, salt, 1, null, now, now
   );
   
   // 创建用户积分账户
@@ -59,16 +60,16 @@ export const createUser = async (
   );
   
   return {
-    id,
-    username,
-    email,
-    phone,
-    passwordHash,
-    salt,
-    isVerified: false,
-    verificationToken,
-    createdAt: new Date(now),
-    updatedAt: new Date(now)
+    id, 
+    username, 
+    email, 
+    phone, 
+    passwordHash, 
+    salt, 
+    isVerified: true, 
+    verificationToken: null, 
+    createdAt: new Date(now), 
+    updatedAt: new Date(now) 
   };
 };
 

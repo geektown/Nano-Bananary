@@ -54,7 +54,7 @@ router.post('/register', async (req, res) => {
     // sendVerificationEmail(user.email, user.verificationToken);
     
     res.status(201).json({
-      message: 'User created successfully. Please verify your email.',
+      message: 'User created successfully.',
       userId: user.id,
       token: token
     });
