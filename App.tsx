@@ -169,7 +169,7 @@ const App: React.FC = () => {
             imagePayload = { base64: primaryBase64, mimeType: primaryMimeType };
         }
 
-        const token = localStorage.getItem('jwt');
+        const token = localStorage.getItem('token');
         const response = await fetch('http://localhost:3000/api/services/generate-video', {
             method: 'POST',
             headers: {
@@ -185,7 +185,7 @@ const App: React.FC = () => {
 
         if (!response.ok) {
             if (response.status === 401) {
-                localStorage.removeItem('jwt');
+                localStorage.removeItem('token');
                 throw new Error('401');
             } else if (response.status === 402) {
                 throw new Error('402');
@@ -217,7 +217,7 @@ const App: React.FC = () => {
         console.error(err);
         if (err instanceof Error && err.message === '401') {
           // Token expired or invalid
-          localStorage.removeItem('jwt');
+          localStorage.removeItem('token');
           setError(t('auth.tokenExpired'));
           setIsLoginModalOpen(true);
         } else if (err instanceof Error && err.message === '402') {
@@ -300,7 +300,7 @@ const App: React.FC = () => {
       console.error(err);
       if (err instanceof Error && err.message === '401') {
         // Token expired or invalid
-        localStorage.removeItem('jwt');
+        localStorage.removeItem('token');
         setError(t('auth.tokenExpired'));
         setIsLoginModalOpen(true);
       } else if (err instanceof Error && err.message === '402') {

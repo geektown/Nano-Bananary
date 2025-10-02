@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = localStorage.getItem('jwt');
+        const token = localStorage.getItem('token');
         if (token) {
           setIsLoading(true);
           const response = await fetch('http://localhost:3000/api/users/me', {
@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setUser(userData);
           } else {
             // Token is invalid or expired, remove it
-            localStorage.removeItem('jwt');
+            localStorage.removeItem('token');
             setUser(null);
           }
         } else {
@@ -56,7 +56,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Listen for storage events to handle changes from other tabs
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'jwt') {
+      if (e.key === 'token') {
         checkAuth();
       }
     };
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const { user: userData, token } = await response.json();
       setUser(userData);
-      localStorage.setItem('jwt', token);
+      localStorage.setItem('token', token);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -118,7 +118,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const { user: userData, token } = await response.json();
       setUser(userData);
-      localStorage.setItem('jwt', token);
+      localStorage.setItem('token', token);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -130,12 +130,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('jwt');
+    localStorage.removeItem('token');
   };
 
   const getBalance = async (): Promise<number> => {
     try {
-      const token = localStorage.getItem('jwt');
+      const token = localStorage.getItem('token');
       if (!token || !user) {
         return 0;
       }
@@ -159,7 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addCredit = async (amount: number): Promise<boolean> => {
     try {
-      const token = localStorage.getItem('jwt');
+      const token = localStorage.getItem('token');
       if (!token || !user) {
         return false;
       }
