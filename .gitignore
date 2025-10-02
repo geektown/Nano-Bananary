@@ -28,3 +28,7 @@ database.sqlite
 database.sqlite
 .env
 .env.example
+.env.local
+.env.test
+.env.production
+.env*

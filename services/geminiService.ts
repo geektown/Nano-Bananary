@@ -2,19 +2,13 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { GeneratedContent } from '../types';
 
-// Get API key from environment variables or use an empty string as fallback
-const DEFAULT_API_KEY = process.env.GEMINI_API_KEY || '';
-
 // Create a helper function to get a GoogleGenAI client with the provided API key
-const getGenAIClient = (apiKey: string = DEFAULT_API_KEY) => {
+const getGenAIClient = (apiKey: string) => {
   if (!apiKey) {
     throw new Error("API key is required. Please set GEMINI_API_KEY environment variable or provide it as a parameter.");
   }
   return new GoogleGenAI({ apiKey });
 };
-
-// Create a default client if API key is available
-const defaultClient = DEFAULT_API_KEY ? getGenAIClient() : null;
 
 export async function editImage(
     base64ImageData: string, 
@@ -25,11 +19,14 @@ export async function editImage(
     apiKey?: string
 ): Promise<GeneratedContent> {
   try {
-    // Get AI client with provided API key or default
-    const ai = apiKey ? getGenAIClient(apiKey) : defaultClient;
-    if (!ai) {
+    // 获取 API 密钥（优先使用传入的参数，否则从环境变量获取）
+    const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+    if (!keyToUse) {
         throw new Error("API key is required. Please set GEMINI_API_KEY environment variable or provide it as a parameter.");
     }
+    
+    // 使用获取到的 API 密钥创建客户端
+    const ai = getGenAIClient(keyToUse);
 
     let fullPrompt = prompt;
     const parts: any[] = [
@@ -134,11 +131,14 @@ export async function generateVideo(
     apiKey?: string
 ): Promise<string> {
     try {
-        // Get AI client with provided API key or default
-        const ai = apiKey ? getGenAIClient(apiKey) : defaultClient;
-        if (!ai) {
+        // 获取 API 密钥（优先使用传入的参数，否则从环境变量获取）
+        const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+        if (!keyToUse) {
             throw new Error("API key is required. Please set GEMINI_API_KEY environment variable or provide it as a parameter.");
         }
+        
+        // 使用获取到的 API 密钥创建客户端
+        const ai = getGenAIClient(keyToUse);
 
         onProgress("Initializing video generation...");
 
@@ -184,9 +184,7 @@ export async function generateVideo(
         }
 
         // 注意：积分扣除逻辑已移至服务器端处理
-        // Use the provided API key or the default one for the download URL
-        const keyToUse = apiKey || DEFAULT_API_KEY;
-
+        // 使用获取到的 API 密钥添加到下载 URL
         return `${downloadLink}&key=${keyToUse}`;
 
     } catch (error) {

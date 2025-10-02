@@ -9,8 +9,8 @@ const router = express.Router();
 
 // 服务定价配置
 const SERVICE_PRICES = {
-  'ai-image-edit': 5,
-  'ai-video-generate': 20
+  'ai-image-edit': 3,
+  'ai-video-generate': 3
 };
 
 /**

@@ -1,7 +1,10 @@
 import dotenv from 'dotenv';
 
-// Load environment variables from .env file
+// Load environment variables from .env and .env.local files
+import path from 'path';
 dotenv.config();
+// Also load .env.local for local development settings
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 import express from 'express';
 import cors from 'cors';
@@ -17,8 +20,9 @@ const PORT = process.env.PORT || 3000;
 
 // 中间件配置
 app.use(cors());
-app.use(bodyParser.json());
-app.use(express.urlencoded({ extended: true }));
+// 增加请求大小限制，允许处理较大的图像文件
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // 注册API路由
 app.use('/api/users', userRoutes);

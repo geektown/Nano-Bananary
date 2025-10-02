@@ -23,7 +23,7 @@ type ActiveTool = 'mask' | 'none';
 
 const App: React.FC = () => {
   const { t } = useTranslation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, getBalance } = useAuth();
   
   // 用于强制重新渲染组件，确保AuthContext的状态更新能被正确捕获
   const [forceUpdate, setForceUpdate] = useState(false);
@@ -157,6 +157,13 @@ const App: React.FC = () => {
       return;
     }
 
+    // Check if user has enough credits (at least 3)
+    const balance = await getBalance();
+    if (balance < 3) {
+      setError(t('auth.insufficientCredits'));
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedContent(null);
@@ -230,7 +237,7 @@ const App: React.FC = () => {
         setIsLoading(false);
         setLoadingMessage('');
     }
-  }, [selectedTransformation, customPrompt, primaryImageUrl, aspectRatio, t, isAuthenticated, setIsLoginModalOpen]);
+  }, [selectedTransformation, customPrompt, primaryImageUrl, aspectRatio, t, isAuthenticated, setIsLoginModalOpen, getBalance]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!primaryImageUrl || !selectedTransformation) {
@@ -256,6 +263,13 @@ const App: React.FC = () => {
       return;
     }
 
+    // Check if user has enough credits (at least 3)
+    const balance = await getBalance();
+    if (balance < 3) {
+      setError(t('auth.insufficientCredits'));
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setGeneratedContent(null);
@@ -273,20 +287,43 @@ const App: React.FC = () => {
             secondaryImagePayload = { base64: secondaryBase64, mimeType: secondaryMimeType };
         }
         
-        // For two-step transformations, we need to handle it differently
-        // Since geminiService doesn't support two-step directly, we'll use the promptToUse for now
-        // Future improvement: Enhance geminiService to support two-step transformations
+        // 对于两步转换，我们需要使用不同的处理方式
+        const isTwoStep = selectedTransformation.isTwoStep || false;
+        const stepTwoPrompt = selectedTransformation.stepTwoPrompt || '';
         
         setLoadingMessage(selectedTransformation.isTwoStep ? t('app.loading.step1') : t('app.loading.default'));
         
-        // Directly call Gemini API through geminiService
-        const result = await geminiEditImage(
-            primaryBase64,
-            primaryMimeType,
-            promptToUse,
-            maskBase64,
-            secondaryImagePayload
-        );
+        // 通过服务器API调用，以确保credit被正确扣减
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:3000/api/services/edit-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                base64ImageData: primaryBase64,
+                mimeType: primaryMimeType,
+                prompt: promptToUse,
+                maskBase64: maskBase64,
+                secondaryImage: secondaryImagePayload,
+                isTwoStep: isTwoStep,
+                stepTwoPrompt: stepTwoPrompt
+            })
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                throw new Error('401');
+            } else if (response.status === 402) {
+                throw new Error('402');
+            }
+            throw new Error(`Failed to generate image. Status: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        let result = data.result;
 
         // Apply watermark if needed
         if (result.imageUrl) {
@@ -313,7 +350,7 @@ const App: React.FC = () => {
       setIsLoading(false);
       setLoadingMessage('');
     }
-  }, [primaryImageUrl, secondaryImageUrl, selectedTransformation, maskDataUrl, customPrompt, t, isAuthenticated, setIsLoginModalOpen]);
+  }, [primaryImageUrl, secondaryImageUrl, selectedTransformation, maskDataUrl, customPrompt, t, isAuthenticated, setIsLoginModalOpen, getBalance, embedWatermark]);
   
   // When user logs in and there's a pending generation request, execute it
   useEffect(() => {
