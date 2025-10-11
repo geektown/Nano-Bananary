@@ -2,15 +2,14 @@ import express from 'express';
 import { authMiddleware, getUserIdFromAuth } from '../utils/authUtils.js';
 import { getUserAccount } from '../models/accountModel.js';
 import { checkBalance, deductCredits } from '../models/accountModel.js';
-import { editImage as geminiEditImage, generateVideo as geminiGenerateVideo } from '../../services/geminiService.js';
+import { editImage as geminiEditImage } from '../../services/geminiService.js';
 import type { GeneratedContent } from '../../types';
 
 const router = express.Router();
 
 // 服务定价配置
 const SERVICE_PRICES = {
-  'ai-image-edit': 3,
-  'ai-video-generate': 3
+  'ai-image-edit': 3
 };
 
 /**
@@ -116,59 +115,6 @@ router.post('/edit-image', authMiddleware, async (req, res) => {
   }
 });
 
-/**
- * 处理视频生成请求
- */
-router.post('/generate-video', authMiddleware, async (req, res) => {
-  try {
-    const userId = getUserIdFromAuth(req);
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    
-    // 检查用户积分是否充足
-    const { hasSufficientBalance, requiredCredits } = await checkUserBalance(userId, 'ai-video-generate');
-    if (!hasSufficientBalance) {
-      return res.status(402).json({
-        error: 'Insufficient credits',
-        requiredCredits,
-        message: 'You need more credits to use this service'
-      });
-    }
-    
-    // 获取请求数据
-    const { prompt, aspectRatio, image } = req.body;
-    
-    if (!prompt) {
-      return res.status(400).json({ error: 'Prompt is required' });
-    }
-    
-    // 设置进度回调函数
-    const onProgress = (message: string) => {
-      // 在实际应用中，可以使用WebSocket或其他方式将进度发送给客户端
-      console.log(`Video generation progress: ${message}`);
-    };
-    
-    // 调用Gemini API生成视频
-    const downloadLink = await geminiGenerateVideo(
-      prompt,
-      aspectRatio || '16:9',
-      image || null,
-      onProgress
-    );
-    
-    // 扣除用户积分
-    await deductCredits(userId, requiredCredits, 'Used AI Video Generation service');
-    
-    res.status(200).json({
-      success: true,
-      message: 'Video generation completed',
-      videoUrl: downloadLink
-    });
-  } catch (error) {
-    console.error('Error processing video generation request:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+
 
 export default router;

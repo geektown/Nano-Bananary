@@ -162,14 +162,6 @@ export const TRANSFORMATIONS: Transformation[] = [
     secondaryUploaderTitle: "transformations.effects.colorPalette.uploader2Title",
     secondaryUploaderDescription: "transformations.effects.colorPalette.uploader2Desc",
   },
-  {
-    key: "videoGeneration",
-    titleKey: "transformations.video.title",
-    emoji: "🎬",
-    descriptionKey: "transformations.video.description",
-    isVideo: true,
-    prompt: "CUSTOM",
-  },
   { 
     key: "isolate",
     titleKey: "transformations.effects.isolate.title", 

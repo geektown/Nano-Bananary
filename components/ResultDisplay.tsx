@@ -136,29 +136,6 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({ content, onUseImageAsInpu
       </button>
   );
 
-  // Special view for video results
-  if (content.videoUrl) {
-    const handleDownloadVideo = () => {
-      downloadImage(content.videoUrl!, `generated-video-${Date.now()}.mp4`);
-    };
-
-    return (
-      <div className="w-full h-full flex flex-col items-center gap-4 animate-fade-in">
-        <div className="w-full flex-grow relative bg-[var(--bg-primary)] rounded-lg overflow-hidden shadow-inner border border-[var(--border-primary)] flex items-center justify-center">
-          <video src={content.videoUrl} controls className="max-w-full max-h-full object-contain" />
-        </div>
-        <div className="w-full flex flex-col md:flex-row gap-3 mt-2">
-          <ActionButton onClick={handleDownloadVideo} isPrimary>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            <span>{t('resultDisplay.actions.download')}</span>
-          </ActionButton>
-        </div>
-      </div>
-    );
-  }
-
   // Special view for two-step results
   if (content.secondaryImageUrl && content.imageUrl && originalImageUrl) {
     const imageMap: Record<ImageSelection, string> = { 'Original': originalImageUrl, 'Line Art': content.secondaryImageUrl, 'Final Result': content.imageUrl };

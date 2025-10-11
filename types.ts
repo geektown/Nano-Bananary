@@ -15,14 +15,12 @@ export interface Transformation {
   secondaryUploaderTitle?: string;
   primaryUploaderDescription?: string;
   secondaryUploaderDescription?: string;
-  isVideo?: boolean;
 }
 
 export interface GeneratedContent {
   imageUrl: string | null;
   text: string | null;
   secondaryImageUrl?: string | null;
-  videoUrl?: string;
 }
 
 // 用户管理相关类型

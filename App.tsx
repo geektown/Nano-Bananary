@@ -62,7 +62,6 @@ const App: React.FC = () => {
   const [maskDataUrl, setMaskDataUrl] = useState<string | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9');
   const [activeTool, setActiveTool] = useState<ActiveTool>('none');
   const [history, setHistory] = useState<GeneratedContent[]>([]);
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState<boolean>(false);
@@ -73,7 +72,7 @@ const App: React.FC = () => {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [hasPendingGenerationRequest, setHasPendingGenerationRequest] = useState<boolean>(false);
-  const [pendingGenerationType, setPendingGenerationType] = useState<'image' | 'video' | null>(null);
+  const [pendingGenerationType, setPendingGenerationType] = useState<'image' | null>(null);
 
   useEffect(() => {
     try {
@@ -84,19 +83,7 @@ const App: React.FC = () => {
     }
   }, [transformations]);
 
-  // Cleanup blob URLs on unmount or when dependencies change
-  useEffect(() => {
-    return () => {
-        history.forEach(item => {
-            if (item.videoUrl) {
-                URL.revokeObjectURL(item.videoUrl);
-            }
-        });
-        if (generatedContent?.videoUrl) {
-            URL.revokeObjectURL(generatedContent.videoUrl);
-        }
-    };
-  }, [history, generatedContent]);
+
 
 
 
@@ -139,105 +126,6 @@ const App: React.FC = () => {
     setSecondaryImageUrl(null);
     setSecondaryFile(null);
   };
-
-  const handleGenerateVideo = useCallback(async () => {
-    if (!selectedTransformation) return;
-
-    const promptToUse = customPrompt;
-    if (!promptToUse.trim()) {
-        setError(t('app.error.enterPrompt'));
-        return;
-    }
-
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      setIsLoginModalOpen(true);
-      setHasPendingGenerationRequest(true);
-      setPendingGenerationType('video');
-      return;
-    }
-
-    // Check if user has enough credits (at least 3)
-    const balance = await getBalance();
-    if (balance < 3) {
-      setError(t('auth.insufficientCredits'));
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setGeneratedContent(null);
-
-    try {
-        let imagePayload = null;
-        if (primaryImageUrl) {
-            const primaryMimeType = primaryImageUrl.split(';')[0].split(':')[1] ?? 'image/png';
-            const primaryBase64 = primaryImageUrl.split(',')[1];
-            imagePayload = { base64: primaryBase64, mimeType: primaryMimeType };
-        }
-
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3000/api/services/generate-video', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                prompt: promptToUse,
-                aspectRatio: aspectRatio,
-                image: imagePayload
-            })
-        });
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                localStorage.removeItem('token');
-                throw new Error('401');
-            } else if (response.status === 402) {
-                throw new Error('402');
-            }
-            throw new Error(`Failed to generate video. Status: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const videoUrl = data.videoUrl;
-        
-        setLoadingMessage(t('app.loading.videoFetching'));
-        const videoResponse = await fetch(videoUrl);
-        if (!videoResponse.ok) {
-            throw new Error(`Failed to download video file. Status: ${videoResponse.statusText}`);
-        }
-        const blob = await videoResponse.blob();
-        const objectUrl = URL.createObjectURL(blob);
-
-        const result: GeneratedContent = {
-            imageUrl: null,
-            text: null,
-            videoUrl: objectUrl
-        };
-
-        setGeneratedContent(result);
-        setHistory(prev => [result, ...prev]);
-
-    } catch (err) {
-        console.error(err);
-        if (err instanceof Error && err.message === '401') {
-          // Token expired or invalid
-          localStorage.removeItem('token');
-          setError(t('auth.tokenExpired'));
-          setIsLoginModalOpen(true);
-        } else if (err instanceof Error && err.message === '402') {
-          // Insufficient credits
-          setError(t('auth.insufficientCredits'));
-        } else {
-          setError(err instanceof Error ? err.message : t('app.error.unknown'));
-        }
-    } finally {
-        setIsLoading(false);
-        setLoadingMessage('');
-    }
-  }, [selectedTransformation, customPrompt, primaryImageUrl, aspectRatio, t, isAuthenticated, setIsLoginModalOpen, getBalance]);
 
   const handleGenerateImage = useCallback(async () => {
     if (!primaryImageUrl || !selectedTransformation) {
@@ -356,22 +244,14 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && hasPendingGenerationRequest) {
       setHasPendingGenerationRequest(false);
-      if (pendingGenerationType === 'video') {
-        handleGenerateVideo();
-      } else {
-        handleGenerateImage();
-      }
+      handleGenerateImage();
       setPendingGenerationType(null);
     }
-  }, [isAuthenticated, hasPendingGenerationRequest, pendingGenerationType, handleGenerateImage, handleGenerateVideo]);
+  }, [isAuthenticated, hasPendingGenerationRequest, handleGenerateImage]);
 
   const handleGenerate = useCallback(() => {
-    if (selectedTransformation?.isVideo) {
-      handleGenerateVideo();
-    } else {
-      handleGenerateImage();
-    }
-  }, [selectedTransformation, handleGenerateVideo, handleGenerateImage]);
+    handleGenerateImage();
+  }, [handleGenerateImage]);
 
 
   const handleUseImageAsInput = useCallback(async (imageUrl: string) => {
@@ -438,65 +318,21 @@ const App: React.FC = () => {
   
   let isGenerateDisabled = true;
   if (selectedTransformation) {
-    if (selectedTransformation.isVideo) {
-        isGenerateDisabled = isLoading || !customPrompt.trim();
-    } else {
-        let imagesReady = false;
-        if (selectedTransformation.isMultiImage) {
-            if (selectedTransformation.isSecondaryOptional) {
-                imagesReady = !!primaryImageUrl;
-            } else {
-                imagesReady = !!primaryImageUrl && !!secondaryImageUrl;
-            }
-        } else {
+    let imagesReady = false;
+    if (selectedTransformation.isMultiImage) {
+        if (selectedTransformation.isSecondaryOptional) {
             imagesReady = !!primaryImageUrl;
+        } else {
+            imagesReady = !!primaryImageUrl && !!secondaryImageUrl;
         }
-        isGenerateDisabled = isLoading || isCustomPromptEmpty || !imagesReady;
+    } else {
+        imagesReady = !!primaryImageUrl;
     }
+    isGenerateDisabled = isLoading || isCustomPromptEmpty || !imagesReady;
   }
 
   const renderInputUI = () => {
     if (!selectedTransformation) return null;
-
-    if (selectedTransformation.isVideo) {
-      return (
-        <>
-          <textarea
-            value={customPrompt}
-            onChange={(e) => setCustomPrompt(e.target.value)}
-            placeholder={t('transformations.video.promptPlaceholder')}
-            rows={4}
-            className="w-full mt-2 p-3 bg-[var(--bg-secondary)] border border-[var(--border-primary)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] transition-colors placeholder-[var(--text-tertiary)]"
-          />
-          <div className="mt-4">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">{t('transformations.video.aspectRatio')}</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {(['16:9', '9:16'] as const).map(ratio => (
-                <button
-                  key={ratio}
-                  onClick={() => setAspectRatio(ratio)}
-                  className={`py-2 px-3 text-sm font-semibold rounded-md transition-colors duration-200 ${
-                    aspectRatio === ratio ? 'bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] text-[var(--text-on-accent)]' : 'bg-[rgba(107,114,128,0.2)] hover:bg-[rgba(107,114,128,0.4)]'
-                  }`}
-                >
-                  {t(ratio === '16:9' ? 'transformations.video.landscape' : 'transformations.video.portrait')}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4">
-             <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">{t('transformations.effects.customPrompt.uploader2Title')}</h3>
-            <ImageEditorCanvas
-                onImageSelect={handlePrimaryImageSelect}
-                initialImageUrl={primaryImageUrl}
-                onMaskChange={() => {}}
-                onClearImage={handleClearPrimaryImage}
-                isMaskToolActive={false}
-            />
-          </div>
-        </>
-      );
-    }
 
     if (selectedTransformation.isMultiImage) {
       return (
@@ -634,13 +470,13 @@ const App: React.FC = () => {
                       {t(selectedTransformation.titleKey)}
                     </h2>
                     {selectedTransformation.prompt !== 'CUSTOM' ? (
-                       <p className="text-[var(--text-secondary)]">{t(selectedTransformation.descriptionKey)}</p>
-                    ) : (
-                      !selectedTransformation.isVideo && <p className="text-[var(--text-secondary)]">{t(selectedTransformation.descriptionKey)}</p>
-                    )}
+                     <p className="text-[var(--text-secondary)]">{t(selectedTransformation.descriptionKey)}</p>
+                  ) : (
+                    <p className="text-[var(--text-secondary)]">{t(selectedTransformation.descriptionKey)}</p>
+                  )}
                   </div>
                   
-                  {selectedTransformation.prompt === 'CUSTOM' && !selectedTransformation.isVideo && (
+                  {selectedTransformation.prompt === 'CUSTOM' && (
                     <textarea
                         value={customPrompt}
                         onChange={(e) => setCustomPrompt(e.target.value)}
